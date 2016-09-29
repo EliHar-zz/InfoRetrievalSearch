@@ -1,58 +1,65 @@
-import sys
-import nltk
-import re
 import json
+import nltk
+import os
+import re
+import string
+import sys
+import threading
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 
-def removeStopwords(text):
-        return [word for word in text if word not in stopwords.words('english')]
+def processFile(filename):
+	print '\nReading file:' + filename + ' ...'
+        with open(sys.argv[1] + filename, 'r') as myFile:
+        	data = myFile.read().replace('\n',' ')
 
-print '\nReading file:' + sys.argv[1] + ' ...'
+	print '\nSplitting documents...'
+	documents = re.split("<REUTERS", data)
+	del documents[0]
+	tokens = []
+	outputFilename = filename + '_OUTPUT.txt'
+	output = open(outputFilename, 'w')
+	# Only keeps text from TITLE and BODY without tags or HTML symbols.
+	for i in range(len(documents)):
+		# Get the document ID
+		docID = re.findall(r'NEWID="(.*?)">', documents[i])
+		if docID:
+			docID = docID[0]
+		else:
+			docID = ''
 
-CORPUS_PATH = "/nfs/home/e/e_harou/Documents/InfoRetrieval/InfoRetrievalSearch/ReutersCorpus/"
+		# Get the title
+		title =  re.findall(r'<TITLE>(.*?)</TITLE>', documents[i])
+		if title:
+			title = title[0]
+		else:
+			title = ''
+		
+		# Get the body
+		body = re.findall(r'<BODY>(.*?)</BODY>', documents[i])
+		if body:
+			body = body[0]
+		else:
+			body = ''
 
-with open(CORPUS_PATH + sys.argv[1], 'r') as myFile:
-	data = myFile.read()
+		documents[i] = title + ' ' + body
+		documents[i] = re.sub(r'&#.+;',' ',documents[i])
+		documents[i] = re.sub(r'&lt;','<',documents[i])
+		documents[i] = re.sub(r'&gt;','>',documents[i])
 
-print '\nSplitting documents...'
-documents = re.split("<REUTERS", data)
+		# 2. Tokenization of words and removal of punctuation
+		documents[i] = nltk.word_tokenize(documents[i].translate(None, string.punctuation))
+		# 3. Removing Stopwords
+		documents[i] = [word for word in documents[i] if word.lower() not in stopwords.words('english')]
 
-docID = re.findall(r'NEWID="(.*?)">', data, re.DOTALL)
-titles = re.findall(r'<TITLE>(.*?)</TITLE>', data, re.DOTALL)
-bodies = re.findall(r'<BODY>(.*?)</BODY>', data, re.DOTALL)
+		for token in documents[i]:
+			tokens.append((token, docID))
 
-print len(docID),len(titles),len(bodies)
+	json.dump(tokens, output)
+	output.close()
+	print '\nFinished... created '+ outputFilename
 
-del documents[0]
-
-tokens = []
-outputFilename = sys.argv[1] + '_OUTPUT.txt'
-output = open(outputFilename, 'w')
-# Only keeps text from TITLE and BODY without tags or HTML symbols.
-for i in range(len(documents)):
-	docID = re.findall(r'NEWID="(.*?)">', documents[i])[0]
-	title =  re.findall(r'<TITLE>(.*?)</TITLE>', documents[i])
-	if title:
-		title = title[0] 
-	body = re.findall(r'<BODY>(.*?)</BODY>', documents[i])
-	if body:
-		body = body[0]
-	documents[i] = title + ' ' + body
-	documents[i] = re.sub(r'&#.+;',' ',documents[i])
-	documents[i] = re.sub(r'&lt;','<',documents[i])
-	documents[i] = re.sub(r'&gt;','>',documents[i])
-	documents[i] = documents[i].lower()
-	
-	# 2. Tokenization of words by punctuation except the period
-        documents[i] = nltk.word_tokenize(documents[i])
-        # 3. Removing Stopwords
-        documents[i] = removeStopwords(documents[i])
-
-	for token in documents[i]:
-		tokens.append((token, docID))
-		json.dump((token, docID),output)
-		output.flush()
-output.close()
-
-print '\nFinished... created'+ outputFilename
+for filename in os.listdir(sys.argv[1]):
+	if filename.endswith('.sgm'):
+		thread = threading.Thread(target=processFile, args=(filename,))
+		thread.start()
