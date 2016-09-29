@@ -43,10 +43,11 @@ def processFile(filename):
 			body = ''
 
 		documents[i] = title + ' ' + body
-		documents[i] = re.sub(r'&#.+;',' ',documents[i])
-		documents[i] = re.sub(r'&lt;','<',documents[i])
-		documents[i] = re.sub(r'&gt;','>',documents[i])
-
+		documents[i] = re.sub(r'&#.+;', ' ', documents[i])
+		documents[i] = re.sub(r'&lt;', '<', documents[i])
+		documents[i] = re.sub(r'&gt;', '>', documents[i])
+		# Remove non-ASCII values
+		documents[i] = re.sub(r'[^\x00-\x7F]+', ' ', documents[i])
 		# 2. Tokenization of words and removal of punctuation
 		documents[i] = nltk.word_tokenize(documents[i].translate(None, string.punctuation))
 		# 3. Removing Stopwords
