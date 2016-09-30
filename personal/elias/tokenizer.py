@@ -1,24 +1,22 @@
+import collections
 import json
 import nltk
 import os
 import re
 import string
 import sys
-import threading
+from collections import OrderedDict
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 
-def processFile(filename):
-	print '\nReading file:' + filename + ' ...'
+def getPostings(filename):
         with open(sys.argv[1] + filename, 'r') as myFile:
         	data = myFile.read().replace('\n',' ')
 
-	print '\nSplitting documents...'
 	documents = re.split("<REUTERS", data)
 	del documents[0]
-	tokens = []
-	outputFilename = filename + '_OUTPUT.txt'
-	output = open(outputFilename, 'w')
+	stopwordsList = set(stopwords.words('english'))
+	postings = []
 	# Only keeps text from TITLE and BODY without tags or HTML symbols.
 	for i in range(len(documents)):
 		# Get the document ID
@@ -46,21 +44,52 @@ def processFile(filename):
 		documents[i] = re.sub(r'&#.+;', ' ', documents[i])
 		documents[i] = re.sub(r'&lt;', '<', documents[i])
 		documents[i] = re.sub(r'&gt;', '>', documents[i])
-		# Remove non-ASCII values
+		# 1. Remove numbers
+		documents[i] = re.sub(r'\d+', '', documents[i])
+		# 2. Remove non-ASCII values
 		documents[i] = re.sub(r'[^\x00-\x7F]+', ' ', documents[i])
-		# 2. Tokenization of words and removal of punctuation
+		# 3. Tokenization of words and removal of punctuation
 		documents[i] = nltk.word_tokenize(documents[i].translate(None, string.punctuation))
-		# 3. Removing Stopwords
-		documents[i] = [word for word in documents[i] if word.lower() not in stopwords.words('english')]
-
+		# 4. Removing Stopwords
+		documents[i] = [word for word in documents[i] if word.lower() not in stopwordsList]
 		for token in documents[i]:
-			tokens.append((token, docID))
+			postings.append((token, docID))
+	return postings
 
-	json.dump(tokens, output)
-	output.close()
-	print '\nFinished... created '+ outputFilename
 
+def spimi(postings):
+	print 'Running SPIMI...\n'
+	iterator = iter(postings)
+	MAX_MEMORY = 1228800 #1200MB
+	posting = next(iterator, None)
+	fileNumber = 0
+	dictionary = {}
+	usedMemory = 0
+	while posting is not None:
+		if (usedMemory <= MAX_MEMORY):
+			if posting[0] not in dictionary:
+				dictionary[posting[0]] = [posting[1]]
+                        	usedMemory += sys.getsizeof(json.dumps(posting)) - 37
+			else:
+				dictionary[posting[0]] = set(dictionary[posting[0]])
+				dictionary[posting[0]].add(posting[1])
+				dictionary[posting[0]] = list(dictionary[posting[0]])
+				usedMemory += sys.getsizeof(json.dumps(posting[1])) - 37
+		else:
+			fileNumber += 1	
+			output = open('temp_inverted_index_' + str(fileNumber) + '.txt', 'w')
+			json.dump(OrderedDict(sorted(dictionary.items(), key=lambda t: t[0])), output)
+                	output.close()
+			dictionary = {}
+                	usedMemory = 0
+			print 'created file temp_inverted_index_' + str(fileNumber) + '.txt'
+		posting = next(iterator, None)
+
+
+
+print '\nProcessing documents...'
+postings = []
 for filename in os.listdir(sys.argv[1]):
 	if filename.endswith('.sgm'):
-		thread = threading.Thread(target=processFile, args=(filename,))
-		thread.start()
+		postings += getPostings(filename)
+spimi(postings)
