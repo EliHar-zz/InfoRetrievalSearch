@@ -65,16 +65,19 @@ def spimi(postings):
 	fileNumber = 0
 	dictionary = {}
 	usedMemory = 0
+	STRING_SIZE = 37
 	while posting is not None:
 		if (usedMemory <= MAX_MEMORY):
 			if posting[0] not in dictionary:
-				dictionary[posting[0]] = [posting[1]]
-                        	usedMemory += sys.getsizeof(json.dumps(posting)) - 37
+				# Stored in format {term: (docFreq, documents), ...}
+				dictionary[posting[0]] = [1, [posting[1]]]
+                        	usedMemory += sys.getsizeof(json.dumps(posting)) - STRING_SIZE
 			else:
-				dictionary[posting[0]] = set(dictionary[posting[0]])
-				dictionary[posting[0]].add(posting[1])
-				dictionary[posting[0]] = list(dictionary[posting[0]])
-				usedMemory += sys.getsizeof(json.dumps(posting[1])) - 37
+				dictionary[posting[0]][1] = set(dictionary[posting[0]][1]) # Convert to set to avoid dupplicates
+				dictionary[posting[0]][1].add(posting[1])
+				dictionary[posting[0]][0] += 1 # Increment document frequency
+				dictionary[posting[0]][1] = list(dictionary[posting[0]][1])
+				usedMemory += sys.getsizeof(json.dumps(posting[1])) - STRING_SIZE
 		else:
 			fileNumber += 1	
 			output = open('temp_inverted_index_' + str(fileNumber) + '.txt', 'w')
