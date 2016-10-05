@@ -9,8 +9,12 @@ from collections import OrderedDict
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 
+#Global Constants
+BLOCK_SIZE = 1024000 #1,024,000Bytes
+PATH = '../../ReutersCorpus/'
+
 def getPostings(filename):
-        with open('../../ReutersCorpus/' + filename, 'r') as myFile:
+        with open(PATH + filename, 'r') as myFile:
         	data = myFile.read().replace('\n',' ')
 
 	documents = re.split("<REUTERS", data)
@@ -57,16 +61,14 @@ def getPostings(filename):
 	return postings
 
 
-def spimi(postings):
+def spimi(generator, blockSize):
 	print 'Running SPIMI...\n'
-	iterator = iter(postings)
-	MAX_MEMORY = 1000000 #1200MB
-	posting = next(iterator, None)
+	posting = next(generator, None)
 	fileNumber = 0
 	dictionary = {}
 	usedMemory = 0
 	while posting is not None:
-		if (usedMemory <= MAX_MEMORY):
+		if (usedMemory <= blockSize):
 			if posting[0] not in dictionary:
 				# Stored in format {term: (docFreq, documents), ...}
 				dictionary[posting[0]] = [1, set([posting[1]])]
@@ -79,13 +81,13 @@ def spimi(postings):
 			output = open('temp_inverted_index_' + str(fileNumber) + '.txt', 'w')
 			# Converting the sets to lists in order to be serialized
 			for term in dictionary:
-				dictionary[term][1] = list(dictionary[term][1])
+				dictionary[term][1] = sorted(list(dictionary[term][1]))
 			json.dump(OrderedDict(sorted(dictionary.items(), key=lambda t: t[0])), output)
 			output.close()
 			dictionary = {}
 			usedMemory = 0
 			print 'created file temp_inverted_index_' + str(fileNumber) + '.txt'
-		posting = next(iterator, None)
+		posting = next(generator, None)
 
 
 
@@ -94,4 +96,5 @@ postings = []
 for filename in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
 	if filename.endswith('.sgm'):
 		postings += getPostings(filename)
-spimi(postings)
+postingsGenerator = iter(postings)
+spimi(postingsGenerator, BLOCK_SIZE)
