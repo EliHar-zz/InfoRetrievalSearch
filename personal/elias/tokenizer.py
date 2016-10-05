@@ -10,7 +10,7 @@ from nltk.corpus import stopwords
 from nltk import  word_tokenize
 
 def getPostings(filename):
-        with open(sys.argv[1] + filename, 'r') as myFile:
+        with open('../../ReutersCorpus/' + filename, 'r') as myFile:
         	data = myFile.read().replace('\n',' ')
 
 	documents = re.split("<REUTERS", data)
@@ -60,31 +60,30 @@ def getPostings(filename):
 def spimi(postings):
 	print 'Running SPIMI...\n'
 	iterator = iter(postings)
-	MAX_MEMORY = 1228800 #1200MB
+	MAX_MEMORY = 1000000 #1200MB
 	posting = next(iterator, None)
 	fileNumber = 0
 	dictionary = {}
 	usedMemory = 0
-	STRING_SIZE = 37
 	while posting is not None:
 		if (usedMemory <= MAX_MEMORY):
 			if posting[0] not in dictionary:
 				# Stored in format {term: (docFreq, documents), ...}
-				dictionary[posting[0]] = [1, [posting[1]]]
-                        	usedMemory += sys.getsizeof(json.dumps(posting)) - STRING_SIZE
+				dictionary[posting[0]] = [1, set([posting[1]])]
 			else:
-				dictionary[posting[0]][1] = set(dictionary[posting[0]][1]) # Convert to set to avoid dupplicates
 				dictionary[posting[0]][1].add(posting[1])
 				dictionary[posting[0]][0] += 1 # Increment document frequency
-				dictionary[posting[0]][1] = list(dictionary[posting[0]][1])
-				usedMemory += sys.getsizeof(json.dumps(posting[1])) - STRING_SIZE
+			usedMemory = sys.getsizeof(dictionary)
 		else:
 			fileNumber += 1	
 			output = open('temp_inverted_index_' + str(fileNumber) + '.txt', 'w')
+			# Converting the sets to lists in order to be serialized
+			for term in dictionary:
+				dictionary[term][1] = list(dictionary[term][1])
 			json.dump(OrderedDict(sorted(dictionary.items(), key=lambda t: t[0])), output)
-                	output.close()
+			output.close()
 			dictionary = {}
-                	usedMemory = 0
+			usedMemory = 0
 			print 'created file temp_inverted_index_' + str(fileNumber) + '.txt'
 		posting = next(iterator, None)
 
@@ -92,7 +91,7 @@ def spimi(postings):
 
 print '\nProcessing documents...'
 postings = []
-for filename in os.listdir(sys.argv[1]):
+for filename in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
 	if filename.endswith('.sgm'):
 		postings += getPostings(filename)
 spimi(postings)
