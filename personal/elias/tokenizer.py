@@ -15,8 +15,8 @@ BLOCK_SIZE = 1024000 #1,024,000Bytes size of block in memory. Not same as on dis
 PATH = '../../ReutersCorpus/'
 
 def getPostings(fileName):
-        with open(PATH + fileName, 'r') as myFile:
-        	data = myFile.read().replace('\n',' ')
+	with open(PATH + fileName, 'r') as myFile:
+		data = myFile.read().replace('\n',' ')
 
 	documents = re.split("<REUTERS", data)
 	del documents[0]
@@ -75,11 +75,11 @@ def writeBlockToDisk(sortedDictionary, fileName):
 	pickle.dump(sortedDictionary, output)
 	output.close()
 	print 'created file '+fileName
-	return output
+	return True
 
 def sortDocIDs(dictionary):
 	for term in dictionary:
-		dictionary[term][1] = sorted(dictionary[term][1])
+		dictionary[term][1] = OrderedDict(sorted(dictionary[term][1].items(), key=lambda t: t[0]))
 	return dictionary
 
 def spimiInvert(token_stream, blockSize):
@@ -87,14 +87,16 @@ def spimiInvert(token_stream, blockSize):
 	dictionary = {}
 	while (sys.getsizeof(dictionary) <= blockSize):
 		posting = next(token_stream, None)
-		if posting:
+		if posting: #[term, docID]
 			if posting[0] not in dictionary:
-				# Stored in format {term: [docFreq, set([doIDs])}
-				dictionary[posting[0]] = [1, set([posting[1]])]
+				# Stored in format {term: [docFreq, {docID:termFreq, docID:termFrec ...}}
+				dictionary[posting[0]] = [1, {posting[1]:1}]
 			else:
 				if posting[1] not in dictionary[posting[0]][1]:
-					dictionary[posting[0]][1].add(posting[1])
+					dictionary[posting[0]][1][posting[1]] = 1
 					dictionary[posting[0]][0] += 1 # Increment document frequency
+				else:
+					dictionary[posting[0]][1][posting[1]] += 1
 		else:
 			break
 	
@@ -103,7 +105,7 @@ def spimiInvert(token_stream, blockSize):
 		dictionary = sortDocIDs(dictionary)
 		return writeBlockToDisk(dictionary, fileName)
 	else:
-		return None
+		return False
 
 
 print '\nProcessing documents...'
