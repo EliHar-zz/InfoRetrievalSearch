@@ -1,7 +1,8 @@
 import collections
-import json
+import glob
 import nltk
 import os
+import pickle
 import re
 import string
 import sys
@@ -10,11 +11,11 @@ from nltk.corpus import stopwords
 from nltk import  word_tokenize
 
 #Global Constants
-BLOCK_SIZE = 1024000 #1,024,000Bytes
+BLOCK_SIZE = 1024000 #1,024,000Bytes size of block in memory. Not same as on disk
 PATH = '../../ReutersCorpus/'
 
-def getPostings(filename):
-        with open(PATH + filename, 'r') as myFile:
+def getPostings(fileName):
+        with open(PATH + fileName, 'r') as myFile:
         	data = myFile.read().replace('\n',' ')
 
 	documents = re.split("<REUTERS", data)
@@ -60,41 +61,57 @@ def getPostings(filename):
 			postings.append((token, docID))
 	return postings
 
+def getNewFileName():
+	if not os.path.isfile('temp_inverted_index_1.pickle'):
+		return 'temp_inverted_index_1.pickle'
+	else:
+		return 'temp_inverted_index_'+str(int(re.findall(r'index_(.*?).pickle', max(glob.iglob('*.pickle'), key=os.path.getctime))[0])+1)+'.pickle'
 
-def spimi(generator, blockSize):
-	print 'Running SPIMI...\n'
-	posting = next(generator, None)
-	fileNumber = 0
+def sortTerms(dictionary):
+	return OrderedDict(sorted(dictionary.items(), key=lambda t: t[0]))
+
+def writeBlockToDisk(sortedDictionary, fileName):
+	output = open(fileName, 'w')
+	pickle.dump(sortedDictionary, output)
+	output.close()
+	print 'created file '+fileName
+	return output
+
+def sortDocIDs(dictionary):
+	for term in dictionary:
+		dictionary[term][1] = sorted(dictionary[term][1])
+	return dictionary
+
+def spimiInvert(token_stream, blockSize):
+	fileName = getNewFileName()
 	dictionary = {}
-	usedMemory = 0
-	while posting is not None:
-		if (usedMemory <= blockSize):
+	while (sys.getsizeof(dictionary) <= blockSize):
+		posting = next(token_stream, None)
+		if posting:
 			if posting[0] not in dictionary:
-				# Stored in format {term: (docFreq, documents), ...}
+				# Stored in format {term: [docFreq, set([doIDs])}
 				dictionary[posting[0]] = [1, set([posting[1]])]
 			else:
-				dictionary[posting[0]][1].add(posting[1])
-				dictionary[posting[0]][0] += 1 # Increment document frequency
-			usedMemory = sys.getsizeof(dictionary)
+				if posting[1] not in dictionary[posting[0]][1]:
+					dictionary[posting[0]][1].add(posting[1])
+					dictionary[posting[0]][0] += 1 # Increment document frequency
 		else:
-			fileNumber += 1	
-			output = open('temp_inverted_index_' + str(fileNumber) + '.txt', 'w')
-			# Converting the sets to lists in order to be serialized
-			for term in dictionary:
-				dictionary[term][1] = sorted(list(dictionary[term][1]))
-			json.dump(OrderedDict(sorted(dictionary.items(), key=lambda t: t[0])), output)
-			output.close()
-			dictionary = {}
-			usedMemory = 0
-			print 'created file temp_inverted_index_' + str(fileNumber) + '.txt'
-		posting = next(generator, None)
-
+			break
+	
+	if len(dictionary) > 0:
+		dictionary = sortTerms(dictionary)
+		dictionary = sortDocIDs(dictionary)
+		return writeBlockToDisk(dictionary, fileName)
+	else:
+		return None
 
 
 print '\nProcessing documents...'
 postings = []
-for filename in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
-	if filename.endswith('.sgm'):
-		postings += getPostings(filename)
-postingsGenerator = iter(postings)
-spimi(postingsGenerator, BLOCK_SIZE)
+for fileName in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
+	if fileName.endswith('.sgm'):
+		postings += getPostings(fileName)
+
+token_stream = iter(postings)
+while spimiInvert(token_stream, BLOCK_SIZE):
+	pass
