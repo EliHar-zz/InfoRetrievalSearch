@@ -70,7 +70,7 @@ def getNewFileName():
 def sortTerms(dictionary):
 	return OrderedDict(sorted(dictionary.items(), key=lambda t: t[0]))
 
-def writeBlockToDisk(sortedDictionary, fileName):
+def writeToDisk(sortedDictionary, fileName):
 	output = open(fileName, 'w')
 	pickle.dump(sortedDictionary, output)
 	output.close()
@@ -79,7 +79,7 @@ def writeBlockToDisk(sortedDictionary, fileName):
 
 def sortDocIDs(dictionary):
 	for term in dictionary:
-		dictionary[term][1] = OrderedDict(sorted(dictionary[term][1].items(), key=lambda t: t[0]))
+		dictionary[term][1] = OrderedDict(sorted(dictionary[term][1].items(), key=lambda t: int(t[0])))
 	return dictionary
 
 def spimiInvert(token_stream, blockSize):
@@ -103,11 +103,81 @@ def spimiInvert(token_stream, blockSize):
 	if len(dictionary) > 0:
 		dictionary = sortTerms(dictionary)
 		dictionary = sortDocIDs(dictionary)
-		return writeBlockToDisk(dictionary, fileName)
+		return writeToDisk(dictionary, fileName)
 	else:
 		return False
 
+def mergDicts(dict1, dict2):
+	invertedIndex = OrderedDict()
+	if dict1 != None and dict2 != None:
+		iter1 = iter(dict1)
+		iter2 = iter(dict2)
+		
+		term1 = next(iter1,None)
+		term2 = next(iter2,None)
+		while term1 != None and term2 != None:
+			if term1 <= term2:
+				if term1 not in invertedIndex:
+					invertedIndex[term1] = dict1[term1]
+				else:
+					for docID in dict1[term1][1]:
+						if docID in invertedIndex[term1][1]:
+							invertedIndex[term1][1][docID] += dict1[term1][1][docID]
+						else:
+							invertedIndex[term1][1][docID] = dict1[term1][1][docID]
+							invertedIndex[term1][0] += 1
+				term1 = next(iter1,None)
+			elif term2 < term1:
+				if term2 not in invertedIndex:
+					invertedIndex[term2] = dict2[term2]
+				else:
+					for docID in dict2[term2][1]:
+						if docID in invertedIndex[term2][1]:
+							invertedIndex[term2][1][docID] += dict2[term2][1][docID]
+						else:
+							invertedIndex[term2][1][docID] = dict2[term2][1][docID]
+							invertedIndex[term2][0] += 1
+				term2 = next(iter2,None)
+		
+		if term1 is None:
+			while term2 != None:
+				if term2 not in invertedIndex:
+					invertedIndex[term2] = dict2[term2]
+				else:
+					for docID in dict2[term2][1]:
+						if docID in invertedIndex[term2][1]:
+							invertedIndex[term2][1][docID] += dict2[term2][1][docID]
+						else:
+							invertedIndex[term2][1][docID] = dict2[term2][1][docID]
+							invertedIndex[term2][0] += 1
+				term2 = next(iter2,None)
+		else:
+			while term1 != None:
+				if term1 not in invertedIndex:
+					invertedIndex[term1] = dict1[term1]
+				else:
+					for docID in dict1[term1][1]:
+						if docID in invertedIndex[term1][1]:
+							invertedIndex[term1][1][docID] += dict1[term1][1][docID]
+						else:
+							invertedIndex[term1][1][docID] = dict1[term1][1][docID]
+							invertedIndex[term1][0] += 1
+				term1 = next(iter1,None)
+	return invertedIndex
 
+
+def mergeFiles(pickleFiles):
+	invertedIndex = OrderedDict()	
+	fileName = next(pickleFiles, None)
+	while fileName != None:
+		print '\nMerging file: ' + fileName
+		dict = pickle.load(open(fileName,'r'))
+		invertedIndex = mergDicts(dict, invertedIndex)
+		# get the next file to merge
+		fileName = next(pickleFiles, None)
+	writeToDisk(invertedIndex, "inverted_Index.pickle")
+
+# START INDEXING PROGRAM
 print '\nProcessing documents...'
 postings = []
 for fileName in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
@@ -117,3 +187,6 @@ for fileName in os.listdir('../../ReutersCorpus'):#sys.argv[1]):
 token_stream = iter(postings)
 while spimiInvert(token_stream, BLOCK_SIZE):
 	pass
+
+# Start Merging
+mergeFiles(iter(glob.iglob('*.pickle')))
