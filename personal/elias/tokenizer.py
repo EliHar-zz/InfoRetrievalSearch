@@ -112,14 +112,14 @@ def spimiInvert(token_stream, maxMemory):
 	while (sys.getsizeof(dictionary) <= maxMemory):
 		posting = next(token_stream, None)
 		if posting: #[term, docID]
-			if posting[0] not in dictionary:
+			if dictionary.has_key(posting[0]):
+				if dictionary[posting[0]].has_key(posting[1]):
+					dictionary[posting[0]][posting[1]] += 1
+				else:
+					dictionary[posting[0]][posting[1]] = 1
+			else:
 				# Stored in format {term: {docID:termFreq, docID:termFrec ...}}
 				dictionary[posting[0]] = {posting[1]:1}
-			else:
-				if posting[1] not in dictionary[posting[0]]:
-					dictionary[posting[0]][posting[1]] = 1
-				else:
-					dictionary[posting[0]][posting[1]] += 1
 		else:
 			break
 	
@@ -144,7 +144,7 @@ def mergDicts(dict1, dict2):
 					invertedIndex[term1] = dict1[term1]
 				else:
 					for docID in dict1[term1]:
-						if docID in invertedIndex[term1]:
+						if invertedIndex[term1].has_key(docID):
 							invertedIndex[term1][docID] += dict1[term1][docID]
 						else:
 							invertedIndex[term1][docID] = dict1[term1][docID]
@@ -154,7 +154,7 @@ def mergDicts(dict1, dict2):
 					invertedIndex[term2] = dict2[term2]
 				else:
 					for docID in dict2[term2]:
-						if docID in invertedIndex[term2]:
+						if invertedIndex[term2].has_key(docID):
 							invertedIndex[term2][docID] += dict2[term2][docID]
 						else:
 							invertedIndex[term2][docID] = dict2[term2][docID]
@@ -166,24 +166,23 @@ def mergDicts(dict1, dict2):
 					invertedIndex[term2] = dict2[term2]
 				else:
 					for docID in dict2[term2]:
-						if docID in invertedIndex[term2]:
+						if invertedIndex[term2].has_key(docID):
 							invertedIndex[term2][docID] += dict2[term2][docID]
 						else:
 							invertedIndex[term2][docID] = dict2[term2][docID]
 				term2 = next(iter2,None)
 		else:
 			while term1 != None:
-				if term1 not in invertedIndex:
-					invertedIndex[term1] = dict1[term1]
-				else:
+				if invertedIndex.has_key(term1):
 					for docID in dict1[term1]:
-						if docID in invertedIndex[term1]:
+						if invertedIndex[term1].has_key(docID):
 							invertedIndex[term1][docID] += dict1[term1][docID]
 						else:
 							invertedIndex[term1][docID] = dict1[term1][docID]
+				else:
+					invertedIndex[term1] = dict1[term1]
 				term1 = next(iter1,None)
 	return invertedIndex
-
 
 def mergeFiles(jsonFiles):
 	invertedIndex = OrderedDict()	
