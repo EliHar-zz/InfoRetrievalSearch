@@ -1,13 +1,16 @@
 import gc
 import glob
 import json
+import nltk
 import os
 import re
+import string
 import sys
 
 from collections import OrderedDict
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
+from nltk.stem.porter import PorterStemmer
 from string import translate
 
 #Global Constants
@@ -54,31 +57,45 @@ def getPostings(fileName):
 			body = ''
 
 		if title != '' or body != '':
-			documents[i] = title + '#####' + body
+			documents[i] = title + '#####' + body # add separator between title and body
+			# Cleaning up
 			documents[i] = re.sub(r'&#.+;', ' ', documents[i], )
 			documents[i] = re.sub(r'&lt;', '<', documents[i])
 			documents[i] = re.sub(r'&gt;', '>', documents[i])
 			documents[i] = re.sub(r'<.{0,9}>', '', documents[i])
-			# Remove appostrophe
-			documents[i] = re.sub(r'\'s|\'re|\'d|\'ll', '', documents[i])
-			
 			# Remove non-ASCII values
 			documents[i] = re.sub(r'[^\x00-\x7F]+', ' ', documents[i])
-			# Remove unneeded spaces
+			# Remove unneeded spaces (needed for storing the documents as text files)
 			documents[i] = re.sub(r'\s{2,5}', ' ', documents[i])
-
+			
+			# Store cleaned up text to be queried later on
 			output = open("documents/" + docID + ".txt","w")
 			output.write(documents[i])
 			output.close()
 			
+			# Remove separation so that it doesn't affect indexing
 			documents[i] = re.sub(r'#####', '. ', documents[i])
-# 			documents[i] = documents[i].replace('\n',' ')
-			# 1. Remove numbers
-			documents[i] = re.sub(r'\d+', '', documents[i])
-			# 2. Tokenization of words and removal of punctuation
+			
+			# Tokenization of words and removal of punctuation
 			documents[i] = nltk.word_tokenize(documents[i].translate(None, string.punctuation))
-			# 3. Removing Stopwords
-			documents[i] = [word.lower() for word in documents[i] if word.lower() not in stopwordsList150]
+			
+			# ***************************    Lossy Compression    *******************************
+			#====================================================================================
+			
+# 			# Remove apostrophe
+# 			documents[i] = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in documents[i]]
+# 			# No numbers
+			documents[i] = [re.sub(r'\b\d+\b', '', token) for token in documents[i]]
+			documents[i] = filter(lambda a: a != '', documents[i])
+# 			# Case folding
+			documents[i] = [token.lower() for token in documents[i]]
+# 			# Removing Stopwords 25
+			documents[i] = [token for token in documents[i] if token not in stopwordsList25]
+# 			# Removing Stopwords 150
+			documents[i] = [token for token in documents[i] if token not in stopwordsList150]
+# 			# Stemming (Porter)
+			stemmer = PorterStemmer()
+			documents[i] = [stemmer.stem(token) for token in documents[i]]
 			
 			for token in documents[i]:
 				postings.append((token, docID))
@@ -91,7 +108,7 @@ def getNewFileName():
 	else:
 		return 'temp_inverted_index_'+str(int(re.findall(r'index_(.*?).txt', max(glob.iglob('*.txt'), key=os.path.getctime))[0])+1)+'.txt'
 
-def sortTerms(dictionary):
+def sortDict(dictionary):
 	return OrderedDict(sorted(dictionary.items(), key=lambda t: t[0]))
 
 def writeJsonToFile(object, fileName):
@@ -124,7 +141,7 @@ def spimiInvert(token_stream, maxMemory):
 			break
 	
 	if len(dictionary) > 0:
-		dictionary = sortTerms(dictionary)
+		dictionary = sortDict(dictionary)
 # 		dictionary = sortDocIDs(dictionary)
 		return writeJsonToFile(dictionary, fileName)
 	else:
@@ -185,16 +202,15 @@ def mergDicts(dict1, dict2):
 	return invertedIndex
 
 def mergeFiles(jsonFiles):
-	invertedIndex = OrderedDict()	
+	invertedIndex = {}	
 	fileName = next(jsonFiles, None)
 	while fileName != None:
 		print '\nMerging file: ' + fileName
-		dict = json.load(open(fileName,'r'))
+		dict = json.load(open(fileName,'r'), object_pairs_hook = OrderedDict)
 		invertedIndex = mergDicts(dict, invertedIndex)
 		# get the next file to merge
 		fileName = next(jsonFiles, None)
-# 	invertedIndex = sortDocIDs(invertedIndex)
-	writeJsonToFile(invertedIndex, "inverted_Index.txt")
+	writeJsonToFile(invertedIndex, "inverted_index.txt")
 
 # START INDEXING PROGRAM
 print '\nProcessing documents...'

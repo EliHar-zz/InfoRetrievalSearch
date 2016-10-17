@@ -1,32 +1,39 @@
 import json
-import re
 import nltk
+import re
+import sys
 
 from collections import OrderedDict
-from matplotlib.pyplot import flag
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 from string import translate, punctuation
-from CodeWarrior.Standard_Suite import document
 
+# method to color the text
 def style(text, type):
 	ansi = {'underline': '\033[4m', 'bold': '\033[1m', 'end':'\033[0m\x1b[0m', \
 		'blue':'\033[94m', 'green':'\033[92m' , 'yellow':'\033[93m', \
 		'red':'\033[91m', 'hlg':'\x1b[6;30;42m', 'hly':'\x1b[6;30;43m'}
 	return ansi[type]+'{}{[end]}'.format(text, ansi)
 
+def underlineText(text):
+	text = '\033[4m' + text
+	text = text.replace('\033[0m\x1b[0m', '\033[0m\x1b[0m\033[4m')
+	return text + '\033[0m\x1b[0m'
+
+# Given a query, process the words, tokenize them and determine the type of query AND / OR / Single term 
 # if no logical operator is specified then resort to AND
 def getQueryParams(query):
 	logicalOperator = ''
-	query = re.sub(r'\'s|\'re|\'d|\'ll', '', query)
+	# Remove apostrophes from text
+# 	query = re.sub(r'\'m|\'s|\'re|\'d|\'ll|\'n\'t', '', query)
 	# Remove non-ASCII values
 	query = re.sub(r'[^\x00-\x7F]+', ' ', query)
 	# Remove unneeded spaces
 	query = re.sub(r'\s{2,5}', ' ', query)
 	# Remove numbers
-	query = re.sub(r'\d+', '', query)
+# 	query = re.sub(r'\d+', '', query)
 	# All lower case
-	query = query.lower()
+# 	query = query.lower()
 	# Tokenization of words and removal of punctuation
 	queryTerms = set(nltk.word_tokenize(query.translate(None, punctuation)))
 	# get logical operators AND/OR
@@ -42,9 +49,11 @@ def getQueryParams(query):
 	
 	return (logicalOperator, queryTerms)
 
+# Given a document and a list of query terms, it returns the title and if any of the query terms matched the title
 def titleIndoc(document, queryTerms):
 	title = ''
 	allTerms = ''
+	matched = False
 	for term in queryTerms:
 		allTerms += allTerms+'|'
 	allTerms = allTerms[:len(allTerms)-1]
@@ -52,33 +61,42 @@ def titleIndoc(document, queryTerms):
 	titleMatch = re.search(r'^(.*?)#####', document)
 	if titleMatch:
 		title = titleMatch.group(1)
-		queryTitleMatch = re.search(r''+allTerms+'(?![a-zA-Z0-9_+-])', title, re.I)
-		if queryTitleMatch:
-			for term in queryTerms:
-				title = title.replace(term.upper(), style(term.upper(), 'hlg'))
-	return (title, queryTitleMatch)
+		for term in queryTerms:
+			queryTitleMatch = re.search(r'(\b'+term+'\\b)', title, re.I)
+			if queryTitleMatch:
+				matched = True
+				title = re.sub(r'\b'+term.upper()+'\\b', style(term.upper(), 'green'), title)
+	title = underlineText(title)
+	return (title, matched)
 
+# Given a document and a list of query terms, it returns the displayed text snipet from the body and if any of the query terms matched the snipet
 def bodyInDoc(document, queryTerms):
 	displayedSnipet = ''
-	allTerms = ''
-	for term in queryTerms:
-		allTerms += allTerms+'|'
-	allTerms = allTerms[:len(allTerms)-1]
-	# Get a sample phrase from the body
+	matched = False
+	# Extract the body
 	bodyMatch = re.search(r'#####(.*?)$', document)
 	if bodyMatch:
 		body = bodyMatch.group(1)
-		displayedSnipetMatch = re.search(r'(\.\s|\W)(.{0,80}' + allTerms + '(?![a-zA-Z0-9_+-]).{0,80})\s', body, re.I)
-		if displayedSnipetMatch:
-			displayedSnipet = displayedSnipetMatch.group(2)+'...'
+		# Get a sample phrase from the body
+		for term in queryTerms:
+			displayedSnipetMatch = re.search(r'' + term + '[.,\/#!$%\^&\*;:{}=\-_`~() ]', displayedSnipet, re.I) # To avoid apending a new snipet if new term already in old snipet
+			if displayedSnipet == '' or not displayedSnipetMatch:
+				displayedSnipetMatch = re.search(r'(\.\s|\W)(.{0,100}' + term + '([.,\/#!$%\^&\*;:{}=\-_`~() ]).{0,120})\s', body, re.I)
+				if displayedSnipetMatch:
+					matched = True
+					displayedSnipet += displayedSnipetMatch.group(2)+'... '
+			# Coloring the matched terms in the chosen snipet
 			for term in queryTerms:
-				displayedSnipet = displayedSnipet.replace(term, style(term, 'hly')) # "term"
-				displayedSnipet = displayedSnipet.replace(term[0].upper()+term[1:], style(term[0].upper()+term[1:], 'hly')) #"Term"
-				displayedSnipet = displayedSnipet.replace(term.upper(), style(term.upper(), 'hly')) # "TERM"
-	return (displayedSnipet, displayedSnipetMatch)
+				# Replace all cases of the term: "term", "Term", "TERM"
+				displayedSnipet = re.sub(r'\b'+term.upper()+'\\b', style(term.upper(),'green'), displayedSnipet)
+				displayedSnipet = re.sub(r'\b'+term+'\\b', style(term, 'green'), displayedSnipet)
+				displayedSnipet = re.sub(r'\b'+term[0].upper()+term[1:]+'\\b', style(term[0].upper()+term[1:], 'green'), displayedSnipet)
+	return (displayedSnipet, matched)
 
 def getDocIds(queryParams):
 	if queryParams[0] == None:
+		if len(queryParams[1]) == 0:
+			return {} 
 		singleTerm = list(queryParams[1])[0]
 		if INVERTED_INDEX.has_key(singleTerm):
 			INVERTED_INDEX[singleTerm] = OrderedDict(sorted(INVERTED_INDEX[singleTerm].items(), key=lambda x: x[1], reverse=True))
@@ -149,7 +167,7 @@ def docIdDictIntersect(dict1, dict2):
 		
 
 def search(pageSize):
-	query = raw_input("Look for: "+'\033[92m')
+	query = raw_input("Looking for: \033[93m")
 	print '\r\033[0m\x1b[0m'
 	# Keep program running until ':q' is introduced
 	while query[0] != ':':
@@ -158,11 +176,11 @@ def search(pageSize):
 		docIdDict = getDocIds(queryParams) # gets the doc Id dictionary in order according to the requirements
 		if len(docIdDict) > 0:
 			docIDStream = iter(docIdDict)
-			print style("\n\""+query+"\"" + " is found in " + str(len(docIdDict)) + " documents:","green")
-			getMoreResults = "y"
+			print style("\""+query+"\"" + " is found in " + str(len(docIdDict)) + " documents:","green")
+			getMoreResults = ""
 			docId = 'someID'
 			allResultsCount = len(docIdDict)
-			while (getMoreResults == "y" or getMoreResults == "Y") and docId:
+			while (getMoreResults == "") and docId:
 				displayedResultCount = 0
 				while displayedResultCount < pageSize and docId:
 					docId = next(docIDStream, None)
@@ -171,34 +189,27 @@ def search(pageSize):
 						with open("documents/"+docId+".txt") as file:
 							document = file.read()
 							displayedSnipetText = ''
-# 							title = None
-							#get and process the title and body in a document
-# 							for term in queryTerms:
-# 								if not title:
 							title = titleIndoc(document, queryTerms)
-# 							else:
 							displayedSnipet = bodyInDoc(document, queryTerms)
-# 							displayedSnipetText += displayedSnipet[0]
-							# In case doc pre-processing resulted in words that will give false positive (eg. "B-6P" --> "BP")
-					 		if title[1] is None and displayedSnipet[1] is None:
+							if not title[1] and not displayedSnipet[1]:
 					 			continue
 					 		
 							print style('\nArticle '+docId, 'bold')+': '+title[0]+'\n\t'+displayedSnipet[0]+"\n"
 							displayedResultCount += 1
 				if allResultsCount > 0:
-					getMoreResults = raw_input('More results? (y/n) \033[92m')
+					getMoreResults = raw_input('Press \x1b[6;30;43mRETURN\033[0m\x1b[0m for more results? \033[93m')
 					print '\r\033[0m\x1b[0m' # remove text coloring
 					# Draw separator
 					print '\n===========================================================================================\n'
 		else:
 			print style('No matches found.\n', 'red')
-		query = raw_input("\nLook for: \033[92m")
+		query = raw_input("\nLooking for: \033[93m")
 	# Clear colors in consol
-	print '\r\033[0m\x1b[0m'	
+	print '\r\033[0m\x1b[0m'
 			
-print 'loading search engine...'	
-INVERTED_INDEX = json.load(open('inverted_Index.txt','r'))
-
-print '\n\t\t**************** Welcome to Tap Tap Search ******************\n\n'
-
-search(4)
+			
+# START PROGRAM
+INVERTED_INDEX = json.load(open('indexes/inverted_index_uncompressed.txt','r'))
+PAGE_SIZE = int(sys.argv[1])
+print style('\n\t\t************************* Welcome to Tap Tap Search ***************************\n\n', 'underline')
+search(PAGE_SIZE)
