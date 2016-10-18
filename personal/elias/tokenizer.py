@@ -83,7 +83,7 @@ def getPostings(fileName):
 			#====================================================================================
 			
 # 			# Remove apostrophe
-# 			documents[i] = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in documents[i]]
+			documents[i] = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in documents[i]]
 # 			# No numbers
 			documents[i] = [re.sub(r'\b\d+\b', '', token) for token in documents[i]]
 			documents[i] = filter(lambda a: a != '', documents[i])
