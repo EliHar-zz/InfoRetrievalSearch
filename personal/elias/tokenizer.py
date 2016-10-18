@@ -59,10 +59,10 @@ def getPostings(fileName):
 		if title != '' or body != '':
 			documents[i] = title + '#####' + body # add separator between title and body
 			# Cleaning up
-			documents[i] = re.sub(r'&#.+;', ' ', documents[i], )
+			documents[i] = re.sub(r'&#.+;', ' ', documents[i])
 			documents[i] = re.sub(r'&lt;', '<', documents[i])
 			documents[i] = re.sub(r'&gt;', '>', documents[i])
-			documents[i] = re.sub(r'<.{0,9}>', '', documents[i])
+# 			documents[i] = re.sub(r'<.{0,9}>', '', documents[i])
 			# Remove non-ASCII values
 			documents[i] = re.sub(r'[^\x00-\x7F]+', ' ', documents[i])
 			# Remove unneeded spaces (needed for storing the documents as text files)
@@ -82,20 +82,20 @@ def getPostings(fileName):
 			# ***************************    Lossy Compression    *******************************
 			#====================================================================================
 			
-# 			# Remove apostrophe
-			documents[i] = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in documents[i]]
-# 			# No numbers
-			documents[i] = [re.sub(r'\b\d+\b', '', token) for token in documents[i]]
-			documents[i] = filter(lambda a: a != '', documents[i])
-# 			# Case folding
-			documents[i] = [token.lower() for token in documents[i]]
-# 			# Removing Stopwords 25
-			documents[i] = [token for token in documents[i] if token not in stopwordsList25]
-# 			# Removing Stopwords 150
-			documents[i] = [token for token in documents[i] if token not in stopwordsList150]
-# 			# Stemming (Porter)
-			stemmer = PorterStemmer()
-			documents[i] = [stemmer.stem(token) for token in documents[i]]
+			# Remove apostrophe
+# 			documents[i] = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in documents[i]]
+ 			# No numbers
+# 			documents[i] = [re.sub(r'\b\d+\.?\d*\b', '', token) for token in documents[i]]
+# 			documents[i] = filter(lambda a: a != '', documents[i])
+ 			# Case folding
+# 			documents[i] = [token.lower() for token in documents[i]]
+ 			# Removing Stopwords 25
+# 			documents[i] = [token for token in documents[i] if token not in stopwordsList25]
+ 			# Removing Stopwords 150
+# 			documents[i] = [token for token in documents[i] if token not in stopwordsList150]
+ 			# Stemming (Porter)
+# 			stemmer = PorterStemmer()
+# 			documents[i] = [stemmer.stem(token) for token in documents[i]]
 			
 			for token in documents[i]:
 				postings.append((token, docID))

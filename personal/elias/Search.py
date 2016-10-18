@@ -24,29 +24,28 @@ def underlineText(text):
 # if no logical operator is specified then resort to AND
 def getQueryParams(query):
 	logicalOperator = ''
-	# Remove apostrophes from text
-# 	query = re.sub(r'\'m|\'s|\'re|\'d|\'ll|\'n\'t', '', query)
-	# Remove non-ASCII values
-	query = re.sub(r'[^\x00-\x7F]+', ' ', query)
-	# Remove unneeded spaces
-	query = re.sub(r'\s{2,5}', ' ', query)
-	# Remove numbers
-# 	query = re.sub(r'\d+', '', query)
-	# All lower case
-# 	query = query.lower()
-	# Tokenization of words and removal of punctuation
+	# Remove non-ascii characters
+# 	query = re.sub(r'[^\x00-\x7F]+', ' ', query)
 	queryTerms = set(nltk.word_tokenize(query.translate(None, punctuation)))
+	# Remove apostrophe
+# 	queryTerms = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in queryTerms]
+	# No numbers
+# 	queryTerms = [re.sub(r'\b\d+\.?\d*\b', '', token) for token in queryTerms]
+# 	queryTerms = filter(lambda a: a != '', queryTerms)
+	# Case folding
+# 	queryTerms = [token.lower() for token in queryTerms]
+
 	# get logical operators AND/OR
-	if 'or' in queryTerms:
+	if 'or' in queryTerms or 'OR' in queryTerms:
 		logicalOperator = 'OR'
-	elif len(queryTerms) == 1 and 'and' not in queryTerms: # Single term query
+	elif len(queryTerms) == 1 and 'and' not in queryTerms and 'AND' not in queryTerms: # Single term query
 		logicalOperator = None
 	else:										# Either multiple word query with no OR, so AND // And is in the query
 		logicalOperator = 'AND'
-
-	# Removing Stopwords
-	queryTerms = queryTerms - set(stopwords.words('english'))
-	
+	# remove logical operators
+	queryTerms = queryTerms - set(['and', 'AND', 'or', 'OR'])
+	# Removing Stopwords (done after removing logical operators)
+# 	queryTerms = set(queryTerms) - set(stopwords.words('english'))
 	return (logicalOperator, queryTerms)
 
 # Given a document and a list of query terms, it returns the title and if any of the query terms matched the title
