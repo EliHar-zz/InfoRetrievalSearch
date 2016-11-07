@@ -1,9 +1,11 @@
 import json
 import nltk
+import os
 import re
 import sys
 
 from collections import OrderedDict
+from math import log
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 from string import translate, punctuation
@@ -98,7 +100,7 @@ def getDocIds(queryParams):
 			return {} 
 		singleTerm = list(queryParams[1])[0]
 		if INVERTED_INDEX.has_key(singleTerm):
-			INVERTED_INDEX[singleTerm] = OrderedDict(sorted(INVERTED_INDEX[singleTerm].items(), key=lambda x: x[1], reverse=True))
+# 			INVERTED_INDEX[singleTerm] = OrderedDict(sorted(INVERTED_INDEX[singleTerm].items(), key=lambda x: x[1], reverse=True))
 			return INVERTED_INDEX[singleTerm] # single term
 		else:
 			return {}
@@ -112,10 +114,12 @@ def getDocIds(queryParams):
 						result[docId].add(term)
 					else:
 						result[docId] = set([term])
-		result = OrderedDict(sorted(result.items(), key=lambda x: len(x[1]), reverse=True))
+# 		result = OrderedDict(sorted(result.items(), key=lambda x: len(x[1]), reverse=True))
 		return result
 	elif queryParams[0] == 'AND':
-		return OrderedDict(sorted(andQueryResult(queryParams[1]).items(), key=lambda x: x[1], reverse=True))
+		result = andQueryResult(queryParams[1])
+# 		result = OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True))
+		return result
 
 def orQueryResult(queryTerms):
 	union = {}
@@ -152,7 +156,7 @@ def docIdDictUnion(dict1, dict2):
 	union.update(dict1)
 	for key in dict2:
 		if union.has_key(key):
-			union[key] = union[key]+dict2[key]
+			union[key] = union[key] + dict2[key] # Add up term frequencies
 		else:
 			union[key] = dict2[key]
 	return union
@@ -161,9 +165,57 @@ def docIdDictIntersect(dict1, dict2):
 	intersection = {}
 	for key in dict2:
 		if dict1.has_key(key):
-			intersection[key] = dict1[key]+dict2[key]
+			intersection[key] = dict1[key] + dict2[key] # Add up term frequencies
 	return intersection
 		
+
+# **************************** Ranking   **************************
+
+def docFreq(term):
+	return len(INVERTED_INDEX[term])
+
+def termFreq(term, docId):
+	return INVERTED_INDEX[term][docId]
+
+def IDF(term):
+	numDocs = 20842
+	return log((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5))
+
+def score_BM25(docId, queryTerms):
+	b = 0.75
+	k = 1.2
+	docLength = getDocLength(docId)
+	avgDoclength = getAvgDocLength(docId)
+	score = 0
+	for term in queryTerms:
+		score += (IDF(term) * termFreq(term, docId) * (k + 1)) / (termFreq(term, docId) + k * (1 - b + b * (float(docLength) / avgDoclength)))
+	
+	return score
+
+def getAvgDocLength(docId):
+	numWords = 0
+	fileCount = 0
+	for fileName in os.listdir("documents/"):
+		if fileName.endswith('.txt'):
+			fileCount += 1
+			with open("documents/"+fileName+".txt") as file:
+				document = file.read()
+				numWords += len(document)
+	return float(numWords) / float(fileCount)
+
+def getDocLength(docId):
+	with open("documents/"+docId+".txt") as file:
+		document = file.read()
+		# **** remove any stopwords or anything removed during lossy compression
+		return len(document)
+	
+def getRankedDocs(docIdDict, queryTerms):
+	result = {}
+	for docId in docIdDict:
+		result[docId] = score_BM25(docId, queryTerms)
+	return OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True))
+	
+# **************************** Search  **************************
 
 def search(pageSize):
 	query = raw_input("Looking for: \033[93m")
@@ -173,6 +225,7 @@ def search(pageSize):
 		queryParams = getQueryParams(query)
 		queryTerms = queryParams[1]
 		docIdDict = getDocIds(queryParams) # gets the doc Id dictionary in order according to the requirements
+		docIdDict = getRankedDocs(docIdDict, queryTerms) # get the results ranked using BM25 score
 		if len(docIdDict) > 0:
 			docIDStream = iter(docIdDict)
 			print style("\""+query+"\"" + " is found in " + str(len(docIdDict)) + " documents:","green")
