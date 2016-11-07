@@ -24,7 +24,7 @@ def underlineText(text):
 
 # Given a query, process the words, tokenize them and determine the type of query AND / OR / Single term 
 # if no logical operator is specified then resort to AND
-def getQueryParams(query):
+def getBooleanQueryParams(query):
 	logicalOperator = ''
 	# Remove non-ascii characters
 # 	query = re.sub(r'[^\x00-\x7F]+', ' ', query)
@@ -49,6 +49,21 @@ def getQueryParams(query):
 	# Removing Stopwords (done after removing logical operators)
 # 	queryTerms = set(queryTerms) - set(stopwords.words('english'))
 	return (logicalOperator, queryTerms)
+
+def getQueryTerms(query):
+	# Remove non-ascii characters
+# 	query = re.sub(r'[^\x00-\x7F]+', ' ', query)
+	queryTerms = set(nltk.word_tokenize(query.translate(None, punctuation)))
+	# Remove apostrophe
+# 	queryTerms = [re.sub(r'\b\'m|\'s|\'re|\'d|\'ll|n\'t\b', '', token) for token in queryTerms]
+	# No numbers
+# 	queryTerms = [re.sub(r'\b\d+\.?\d*\b', '', token) for token in queryTerms]
+# 	queryTerms = filter(lambda a: a != '', queryTerms)
+	# Case folding
+# 	queryTerms = [token.lower() for token in queryTerms]
+	# Removing Stopwords
+# 	queryTerms = set(queryTerms) - set(stopwords.words('english'))
+	return queryTerms
 
 # Given a document and a list of query terms, it returns the title and if any of the query terms matched the title
 def titleIndoc(document, queryTerms):
@@ -94,32 +109,43 @@ def bodyInDoc(document, queryTerms):
 				displayedSnipet = re.sub(r'\b'+term[0].upper()+term[1:]+'\\b', style(term[0].upper()+term[1:], 'green'), displayedSnipet)
 	return (displayedSnipet, matched)
 
-def getDocIds(queryParams):
-	if queryParams[0] == None:
-		if len(queryParams[1]) == 0:
-			return {} 
-		singleTerm = list(queryParams[1])[0]
-		if INVERTED_INDEX.has_key(singleTerm):
+# ********** FOR BOOLEAN RETRIEVAL  ************
+# def getDocIds(queryParams):
+# 	if queryParams[0] == None:
+# 		if len(queryParams[1]) == 0:
+# 			return {} 
+# 		singleTerm = list(queryParams[1])[0]
+# 		if INVERTED_INDEX.has_key(singleTerm):
 # 			INVERTED_INDEX[singleTerm] = OrderedDict(sorted(INVERTED_INDEX[singleTerm].items(), key=lambda x: x[1], reverse=True))
-			return INVERTED_INDEX[singleTerm] # single term
-		else:
-			return {}
-	elif queryParams[0] == 'OR':
-		# Add all terms in dictionary of {docID: term}
-		result = {}
-		for term in queryParams[1]:
-			if INVERTED_INDEX.has_key(term):
-				for docId in INVERTED_INDEX[term]:
-					if result.has_key(docId):
-						result[docId].add(term)
-					else:
-						result[docId] = set([term])
+# 			return INVERTED_INDEX[singleTerm] # single term
+# 		else:
+# 			return {}
+# 	elif queryParams[0] == 'OR':
+# 		# Add all terms in dictionary of {docID: term}
+# 		result = {}
+# 		for term in queryParams[1]:
+# 			if INVERTED_INDEX.has_key(term):
+# 				for docId in INVERTED_INDEX[term]:
+# 					if result.has_key(docId):
+# 						result[docId].add(term)
+# 					else:
+# 						result[docId] = set([term])
 # 		result = OrderedDict(sorted(result.items(), key=lambda x: len(x[1]), reverse=True))
-		return result
-	elif queryParams[0] == 'AND':
-		result = andQueryResult(queryParams[1])
+# 		return result
+# 	elif queryParams[0] == 'AND':
+# 		result = andQueryResult(queryParams[1])
 # 		result = OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True))
-		return result
+# 		return result
+	
+def getDocIds(queryTerms):
+	if len(queryTerms) == 0:
+		return {} 
+	result = set([])
+	for term in queryTerms:
+		if INVERTED_INDEX.has_key(term):
+			for docId in INVERTED_INDEX[term]:
+					result.add(docId)
+	return result
 
 def orQueryResult(queryTerms):
 	union = {}
@@ -227,9 +253,8 @@ def search(pageSize):
 	print '\r\033[0m\x1b[0m'
 	# Keep program running until ':q' is introduced
 	while query[0] != ':':
-		queryParams = getQueryParams(query)
-		queryTerms = queryParams[1]
-		docIdDict = getDocIds(queryParams) # gets the doc Id dictionary in order according to the requirements
+		queryTerms = getQueryTerms(query)
+		docIdDict = getDocIds(queryTerms) # gets the doc Id dictionary in order according to the requirements
 		docIdDict = getRankedDocs(docIdDict, queryTerms) # get the results ranked using BM25 score
 		if len(docIdDict) > 0:
 			docIDStream = iter(docIdDict)
