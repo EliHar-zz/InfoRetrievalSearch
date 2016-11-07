@@ -172,33 +172,37 @@ def docIdDictIntersect(dict1, dict2):
 # **************************** Ranking   **************************
 
 def docFreq(term):
+	if not INVERTED_INDEX.has_key(term):
+		return 0 
 	return len(INVERTED_INDEX[term])
 
 def termFreq(term, docId):
+	if not INVERTED_INDEX.has_key(term):
+		return 0
+	elif not INVERTED_INDEX[term].has_key(docId):
+		return 0
 	return INVERTED_INDEX[term][docId]
 
 def IDF(term):
 	numDocs = 20842
 	return log((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5))
 
-def score_BM25(docId, queryTerms):
+def score_BM25(docId, queryTerms, avgDoclength, docLength):
 	b = 0.75
 	k = 1.2
-	docLength = getDocLength(docId)
-	avgDoclength = getAvgDocLength(docId)
 	score = 0
 	for term in queryTerms:
 		score += (IDF(term) * termFreq(term, docId) * (k + 1)) / (termFreq(term, docId) + k * (1 - b + b * (float(docLength) / avgDoclength)))
 	
 	return score
 
-def getAvgDocLength(docId):
+def getAvgDocLength():
 	numWords = 0
 	fileCount = 0
 	for fileName in os.listdir("documents/"):
 		if fileName.endswith('.txt'):
 			fileCount += 1
-			with open("documents/"+fileName+".txt") as file:
+			with open("documents/"+fileName) as file:
 				document = file.read()
 				numWords += len(document)
 	return float(numWords) / float(fileCount)
@@ -212,7 +216,8 @@ def getDocLength(docId):
 def getRankedDocs(docIdDict, queryTerms):
 	result = {}
 	for docId in docIdDict:
-		result[docId] = score_BM25(docId, queryTerms)
+		docLength = getDocLength(docId)
+		result[docId] = score_BM25(docId, queryTerms, avgDoclength, docLength)
 	return OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True))
 	
 # **************************** Search  **************************
@@ -262,6 +267,7 @@ def search(pageSize):
 			
 # START PROGRAM
 INVERTED_INDEX = json.load(open('indexes/inverted_index_uncompressed.txt','r'))
+avgDoclength = getAvgDocLength()
 PAGE_SIZE = int(sys.argv[1])
 print style('\n\t\t************************* Welcome to Tap Tap Search ***************************\n\n', 'underline')
 search(PAGE_SIZE)
