@@ -5,7 +5,7 @@ import re
 import sys
 
 from collections import OrderedDict
-from math import log
+from math import log10
 from nltk.corpus import stopwords
 from nltk import  word_tokenize
 from string import translate, punctuation
@@ -211,15 +211,14 @@ def termFreq(term, docId):
 
 def IDF(term):
 	numDocs = 20842
-	return log((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5))
+	return log10((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5))
 
 def score_BM25(docId, queryTerms, avgDoclength, docLength):
 	b = 0.75
-	k = 1.2
+	k = 2.0
 	score = 0
 	for term in queryTerms:
 		score += (IDF(term) * termFreq(term, docId) * (k + 1)) / (termFreq(term, docId) + k * (1 - b + b * (float(docLength) / avgDoclength)))
-	
 	return score
 
 def getAvgDocLength():
@@ -244,7 +243,8 @@ def getRankedDocs(docIdDict, queryTerms):
 	for docId in docIdDict:
 		docLength = getDocLength(docId)
 		result[docId] = score_BM25(docId, queryTerms, avgDoclength, docLength)
-	return OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True))
+	result = OrderedDict(sorted(result.items(), key=lambda x: x[1], reverse=True)) 
+	return result
 	
 # **************************** Search  **************************
 
@@ -292,7 +292,7 @@ def search(pageSize):
 			
 # START PROGRAM
 INVERTED_INDEX = json.load(open('indexes/inverted_index_uncompressed.txt','r'))
-avgDoclength = getAvgDocLength()
+avgDoclength = 793.322249412 #getAvgDocLength()
 PAGE_SIZE = int(sys.argv[1])
 print style('\n\t\t************************* Welcome to Tap Tap Search ***************************\n\n', 'underline')
 search(PAGE_SIZE)
