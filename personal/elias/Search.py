@@ -211,14 +211,16 @@ def termFreq(term, docId):
 
 def IDF(term):
 	numDocs = 20842
-	return log10((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5))
+	ADJUSTMENT_VALUE = 2
+	return log10((numDocs - docFreq(term) + 0.5) / (docFreq(term) + 0.5)) + ADJUSTMENT_VALUE
 
 def score_BM25(docId, queryTerms, avgDoclength, docLength):
-	b = 0.75
-	k = 2.0
+	k = 2.0 # weight to term freq, the more, the higher the score if term occurs a lot in doc
+	b = 0.75 # The bigger, the less score for longer docs
 	score = 0
 	for term in queryTerms:
 		score += (IDF(term) * termFreq(term, docId) * (k + 1)) / (termFreq(term, docId) + k * (1 - b + b * (float(docLength) / avgDoclength)))
+	# print 'score is: ',score
 	return score
 
 def getAvgDocLength():
@@ -233,10 +235,7 @@ def getAvgDocLength():
 	return float(numWords) / float(fileCount)
 
 def getDocLength(docId):
-	with open("documents/"+docId+".txt") as file:
-		document = file.read()
-		# **** remove any stopwords or anything removed during lossy compression
-		return len(document)
+	return docLengthDict[docId]
 	
 def getRankedDocs(docIdDict, queryTerms):
 	result = {}
@@ -292,6 +291,7 @@ def search(pageSize):
 			
 # START PROGRAM
 INVERTED_INDEX = json.load(open('indexes/inverted_index_uncompressed.txt','r'))
+docLengthDict = json.load(open('indexes/docs_lengths.txt','r'))
 avgDoclength = 793.322249412 #getAvgDocLength()
 PAGE_SIZE = int(sys.argv[1])
 print style('\n\t\t************************* Welcome to Tap Tap Search ***************************\n\n', 'underline')

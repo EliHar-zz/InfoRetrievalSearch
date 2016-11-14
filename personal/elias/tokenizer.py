@@ -17,6 +17,8 @@ from string import translate
 PATH = sys.argv[1]
 MAX_MEMORY = int(sys.argv[2]) #1,024,000Bytes size of block in memory. Not same as on disk
 
+docLengthDict = {} 	# Store a dictionary of documents and their length
+
 def getPostings(fileName):
 	with open(PATH + fileName, 'r') as myFile:
 		data = myFile.read().replace('\n',' ')
@@ -69,9 +71,9 @@ def getPostings(fileName):
 			documents[i] = re.sub(r'\s{2,5}', ' ', documents[i])
 			
 			# Store cleaned up text to be queried later on
-			output = open("documents/" + docID + ".txt","w")
-			output.write(documents[i])
-			output.close()
+			# output = open("documents/" + docID + ".txt","w")
+			# output.write(documents[i])
+			# output.close()
 			
 			# Remove separation so that it doesn't affect indexing
 			documents[i] = re.sub(r'#####', '. ', documents[i])
@@ -79,6 +81,7 @@ def getPostings(fileName):
 			# Tokenization of words and removal of punctuation
 			documents[i] = nltk.word_tokenize(documents[i].translate(None, string.punctuation))
 			
+			docLengthDict[docID] = len(documents[i])
 			# ***************************    Lossy Compression    *******************************
 			#====================================================================================
 			
@@ -218,6 +221,9 @@ postings = []
 for fileName in os.listdir(PATH):
 	if fileName.endswith('.sgm'):
 		postings += getPostings(fileName)
+
+# Store a dictionary of documents and their length
+writeJsonToFile(docLengthDict, "indexes/docs_lengths.txt")
 
 token_stream = iter(postings)
 while spimiInvert(token_stream, MAX_MEMORY):
