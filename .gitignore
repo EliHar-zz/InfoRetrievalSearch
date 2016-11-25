@@ -1,3 +1,4 @@
 *.swp
 *.sgm_OUTPUT.txt
 *.sgm
+*.pyc
