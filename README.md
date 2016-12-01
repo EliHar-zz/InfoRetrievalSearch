@@ -13,12 +13,9 @@
 ### Run Docker container
 <code>docker run -v [local/shared/directory/path]:/root/shared -p 9000:9000 -p 8000:8000 -t -i elihar/ubuntu_scrapy /bin/bash</code>
 
-### Run virtual env
-<code>activate_env</code>
+### Using Crawler
 
-### Run python code (using scrapy)
-<code>python [crawling .py file]</code>
+### Tokenize and index the corpus
 
-### Quit virtual env
-<code>deactivate_env</code>
+### Run sentiment Analysis
 
