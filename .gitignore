@@ -2,3 +2,4 @@
 *.sgm_OUTPUT.txt
 *.sgm
 *.pyc
+ENV/
