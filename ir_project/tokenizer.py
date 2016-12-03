@@ -220,6 +220,9 @@ for fileName in os.listdir(PATH):
 writeJsonToFile(docLengthDict, "indexes/docs_lengths.json")
 writeJsonToFile(docIdDict, "indexes/docIdDict.json")
 
+inverse_docIdDict = {v: k for k, v in docIdDict.iteritems()}
+writeJsonToFile(inverse_docIdDict, "indexes/inverse_docIdDict.json")
+
 token_stream = iter(postings)
 while spimiInvert(token_stream, MAX_MEMORY):
 	pass

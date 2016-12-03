@@ -10,6 +10,9 @@ from vaderSentiment.vaderSentiment import sentiment as vaderSentiment
 
 # Path to corpus
 PATH = sys.argv[1]
+SUB_URL_PATH = ''
+if len(sys.argv) > 2:
+	SUB_URL_PATH = sys.argv[2]
 
 # Afinn Sentiment Analysis
 afinn = Afinn()
@@ -111,27 +114,38 @@ def writeJsonToFile(object, fileName):
 	print 'created file ' + fileName
 	return True
 
+# *********************** MAIN *********************
+
 if __name__ == '__main__':
 
 	print 'Starting Sentiment Analysis...'
-	docId = 1
+
 	analysis_summary = {}
+
+	inverse_docIdDict = json.load(open("indexes/inverse_docIdDict.json", "r"))
+
 	for fileName in os.listdir(PATH):
 		if fileName.endswith('.json'):
 			file = open(PATH + '/' + fileName)
 			documents = json.load(file)
 			department = {}
 			for document in documents:
-				document_str = ''
-				department[docId] = {}
-				document_str = '. '.join([document_str, document['title'], document['body']]).encode('ascii', 'ignore')
+				if SUB_URL_PATH in document['url']:
+					docId = inverse_docIdDict[document['url']]
+					document_str = ''
+					department[docId] = {}
+					document_str = '. '.join([document_str, document['title'], document['body']]).encode('ascii', 'ignore')
 
-				# Save normalized resutls, between -5 and +5
-				department[docId]['google'] = documentGoogleSA(document_str)
-				department[docId]['vader'] = documentVaderSA(document_str)
-				department[docId]['afinn'] = documentAfinnSA(document_str)
-				docId += 1
-			writeJsonToFile(department, 'sentiment/' + fileName)
-			analysis_summary[fileName.replace('.json','')] = deptScoreAvg(department)
+					# Save normalized resutls, between -5 and +5
+					department[docId]['google'] = documentGoogleSA(document_str)
+					department[docId]['vader'] = documentVaderSA(document_str)
+					department[docId]['afinn'] = documentAfinnSA(document_str)
 
-	writeJsonToFile(analysis_summary, 'sentiment/' + 'summary.json')
+			if len(SUB_URL_PATH) > 0:
+				fileName = SUB_URL_PATH + '.json'
+			if len(department) > 0:
+				writeJsonToFile(department, 'sentiment/' + fileName)
+				analysis_summary[fileName.replace('.json','')] = deptScoreAvg(department)
+
+	if len(analysis_summary) > 0:
+		writeJsonToFile(analysis_summary, 'sentiment/' + 'summary_' + SUB_URL_PATH + '.json')
